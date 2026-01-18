@@ -23,7 +23,8 @@ export const AuthProvider = ({ children }) => {
             if (token) {
                 try {
                     const response = await authAPI.getProfile();
-                    setUser(response.data);
+                    // support APIs that return { user: {...} } or the user object directly
+                    setUser(response.data?.user || response.data || null);
                 } catch (error) {
                     console.error('Failed to load user', error);
                     localStorage.removeItem('access_token');
@@ -38,17 +39,22 @@ export const AuthProvider = ({ children }) => {
     const login = async (username, password) => {
         try {
             const response = await authAPI.login({ username, password });
-            const { access, refresh, user } = response.data;
+            const { access, refresh, user: userObj } = response.data;
 
-            localStorage.setItem('access_token', access);
-            localStorage.setItem('refresh_token', refresh);
+            if (access) {
+                localStorage.setItem('access_token', access);
+            }
+            if (refresh) {
+                localStorage.setItem('refresh_token', refresh);
+            }
+
             setToken(access);
-            setUser(user);
+            setUser(userObj || response.data?.user || null);
             return { success: true };
         } catch (error) {
             return {
                 success: false,
-                error: error.response?.data?.error || 'Login failed'
+                error: error.response?.data?.error || error.response?.data || 'Login failed'
             };
         }
     };
@@ -56,12 +62,18 @@ export const AuthProvider = ({ children }) => {
     const register = async (userData) => {
         try {
             const response = await authAPI.register(userData);
-            const { access, refresh, user } = response.data;
+            const { access, refresh, user: userObj } = response.data;
 
-            localStorage.setItem('access_token', access);
-            localStorage.removeItem('refresh_token', refresh);
+            if (access) {
+                localStorage.setItem('access_token', access);
+            }
+            // FIX: store the refresh token (previously the code removed it by mistake)
+            if (refresh) {
+                localStorage.setItem('refresh_token', refresh);
+            }
+
             setToken(access);
-            setUser(user);
+            setUser(userObj || response.data?.user || null);
             return { success: true };
         } catch (error) {
             return {
@@ -75,6 +87,8 @@ export const AuthProvider = ({ children }) => {
         authAPI.logout();
         setToken(null);
         setUser(null);
+        // ensure redirected to login
+        window.location.href = '/login';
     };
 
     return (
@@ -90,3 +104,4 @@ export const AuthProvider = ({ children }) => {
         </AuthContext.Provider>
     );
 };
+

@@ -28,7 +28,11 @@ api.interceptors.request.use(
 api.interceptors.response.use(
     (response) => response,
     async (error) => {
-        const originalRequest = error.config;
+        // Guard: error.config may be undefined in some network errors
+        const originalRequest = error?.config;
+        if (!originalRequest) {
+            return Promise.reject(error);
+        }
 
         if (error.response?.status === 401 && !originalRequest._retry) {
             originalRequest._retry = true;
@@ -50,6 +54,7 @@ api.interceptors.response.use(
                 console.log('Refresh token failed, logging out');
                 localStorage.removeItem('access_token');
                 localStorage.removeItem('refresh_token');
+                // navigate to login page
                 window.location.href = '/login';
             }
         }
@@ -67,11 +72,12 @@ export const authAPI = {
         localStorage.removeItem('refresh_token');
     }
 };
-// frontend/my-react-app/src/services/api.js
-// Add this to the existing exports
+
+// Execution API now sends inputs as well
 export const executionAPI = {
-    executeCode: (code, language = 'python') =>
-        api.post('/execution/execute/', { code, language }),
+    // inputs: optional array of strings to be provided to input() calls
+    executeCode: (code, language = 'python', inputs = []) =>
+        api.post('/execution/execute/', { code, language, inputs }),
 };
 
 export const assessmentAPI = {
